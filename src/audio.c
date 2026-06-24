@@ -58,17 +58,20 @@ static void render_deck(FtDeck *deck, int sample_rate, float *out, int frames, f
 
         float vu_l = 0.0f;
         float vu_r = 0.0f;
-        float deck_gain = pan_gain * deck->volume * db_to_gain(deck->gain_db);
+        float meter_gain = db_to_gain(deck->gain_db);
+        float deck_gain = pan_gain * deck->volume * meter_gain;
         for (size_t i = 0; i < got; i++) {
             float l = tmp[i * 2];
             float r = tmp[i * 2 + 1];
             apply_deck_eq(deck, &l, &r);
+            float meter_l = l * meter_gain;
+            float meter_r = r * meter_gain;
             l *= deck_gain;
             r *= deck_gain;
             out[(done + (int)i) * 2] += l;
             out[(done + (int)i) * 2 + 1] += r;
-            if (fabsf(l) > vu_l) vu_l = fabsf(l);
-            if (fabsf(r) > vu_r) vu_r = fabsf(r);
+            if (fabsf(meter_l) > vu_l) vu_l = fabsf(meter_l);
+            if (fabsf(meter_r) > vu_r) vu_r = fabsf(meter_r);
         }
         deck->vu_l = deck->vu_l * 0.86f + vu_l * 0.14f;
         deck->vu_r = deck->vu_r * 0.86f + vu_r * 0.14f;

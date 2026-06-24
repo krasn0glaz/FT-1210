@@ -359,9 +359,9 @@ double deck_position_seconds(const FtDeck *deck) {
 
 double deck_effective_rate(const FtDeck *deck) {
     double pitch = deck->pitch_percent + deck->nudge_percent;
-    double tempo = deck_current_tempo(deck);
-    if (deck->sync_enabled && tempo > 1.0 && deck->sync_target_bpm > 1.0) {
-        pitch += ((deck->sync_target_bpm / tempo) - 1.0) * 100.0;
+    double bpm = deck_base_bpm(deck);
+    if (deck->sync_enabled && bpm > 1.0 && deck->sync_target_bpm > 1.0) {
+        pitch += ((deck->sync_target_bpm / bpm) - 1.0) * 100.0;
     }
     double rate = 1.0 + pitch / 100.0;
     if (rate < 0.25) rate = 0.25;
@@ -375,6 +375,16 @@ double deck_current_tempo(const FtDeck *deck) {
     return tempo > 1.0 ? tempo : (deck->tempo_bpm > 1.0 ? deck->tempo_bpm : 125.0);
 }
 
+double deck_base_bpm(const FtDeck *deck) {
+    double tempo = deck_current_tempo(deck);
+    int speed = 6;
+    if (deck->loaded && deck->module) {
+        int current_speed = openmpt_module_get_current_speed(deck->module);
+        if (current_speed > 0) speed = current_speed;
+    }
+    return tempo * 6.0 / (double)speed;
+}
+
 double deck_effective_bpm(const FtDeck *deck) {
-    return deck_current_tempo(deck) * deck_effective_rate(deck);
+    return deck_base_bpm(deck) * deck_effective_rate(deck);
 }

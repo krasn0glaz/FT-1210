@@ -81,6 +81,7 @@ void deck_enforce_loop(FtDeck *deck);
 double deck_position_seconds(const FtDeck *deck);
 double deck_effective_rate(const FtDeck *deck);
 double deck_current_tempo(const FtDeck *deck);
+double deck_base_bpm(const FtDeck *deck);
 double deck_effective_bpm(const FtDeck *deck);
 int deck_current_order(const FtDeck *deck);
 int deck_current_row(const FtDeck *deck);

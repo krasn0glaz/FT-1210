@@ -34,8 +34,11 @@ static int browser_count;
 static char browser_cwd[1024] = ".";
 
 static void color(SDL_Renderer *r, Uint8 v) { SDL_SetRenderDrawColor(r, v, v, v, 255); }
+static void color_rgb(SDL_Renderer *r, Uint8 red, Uint8 green, Uint8 blue) { SDL_SetRenderDrawColor(r, red, green, blue, 255); }
 static void fill(SDL_Renderer *r, Rect q, Uint8 v) { SDL_Rect sr = { q.x, q.y, q.w, q.h }; color(r, v); SDL_RenderFillRect(r, &sr); }
+static void fill_rgb(SDL_Renderer *r, Rect q, Uint8 red, Uint8 green, Uint8 blue) { SDL_Rect sr = { q.x, q.y, q.w, q.h }; color_rgb(r, red, green, blue); SDL_RenderFillRect(r, &sr); }
 static void stroke(SDL_Renderer *r, Rect q, Uint8 v) { SDL_Rect sr = { q.x, q.y, q.w, q.h }; color(r, v); SDL_RenderDrawRect(r, &sr); }
+static void stroke_rgb(SDL_Renderer *r, Rect q, Uint8 red, Uint8 green, Uint8 blue) { SDL_Rect sr = { q.x, q.y, q.w, q.h }; color_rgb(r, red, green, blue); SDL_RenderDrawRect(r, &sr); }
 static void line(SDL_Renderer *r, int x1, int y1, int x2, int y2, Uint8 v) { color(r, v); SDL_RenderDrawLine(r, x1, y1, x2, y2); }
 
 static bool contains(Rect q, int x, int y) { return x >= q.x && y >= q.y && x < q.x + q.w && y < q.y + q.h; }
@@ -210,8 +213,9 @@ static void slider(SDL_Renderer *r, Rect q, float value, bool bipolar, const cha
         value = clampf(value, 0.0f, 1.0f);
         handle_y = q.y + q.h - 10 - (int)(value * (float)(q.h - 20));
     }
-    fill(r, (Rect){ q.x + 4, handle_y - 8, q.w - 8, 16 }, 190);
-    stroke(r, (Rect){ q.x + 4, handle_y - 8, q.w - 8, 16 }, 240);
+    Rect cap = { q.x + 4, handle_y - 8, q.w - 8, 16 };
+    fill_rgb(r, cap, 62, 150, 152);
+    stroke_rgb(r, cap, 150, 232, 226);
     if (value_label) text(r, q.x - 14, q.y + q.h + 8, value_label, 1, 150);
 }
 
@@ -518,8 +522,9 @@ static void draw_mixer(SDL_Renderer *r, const FtAudio *audio, const FtDeck decks
     text(r, cf.x, cf.y - 22, "CROSSFADER", 1, 115);
     stroke(r, cf, 85);
     int pos = cf.x + (int)(((audio->crossfader + 1.0f) * 0.5f) * (float)(cf.w - 18));
-    fill(r, (Rect){ pos, cf.y - 7, 18, cf.h + 14 }, 195);
-    stroke(r, (Rect){ pos, cf.y - 7, 18, cf.h + 14 }, 240);
+    Rect cf_cap = { pos, cf.y - 7, 18, cf.h + 14 };
+    fill_rgb(r, cf_cap, 62, 150, 152);
+    stroke_rgb(r, cf_cap, 150, 232, 226);
 }
 
 static void draw_browser(SDL_Renderer *r, const FtUi *ui) {
@@ -633,7 +638,7 @@ static bool handle_deck_click(FtUi *ui, FtAudio *audio, FtDeck decks[2], int dec
     else if (contains(setcue, x, y)) deck_set_cue_current(deck);
     else if (contains(sync, x, y)) {
         deck->sync_enabled = !deck->sync_enabled;
-        if (other->loaded && deck_current_tempo(other) > 1.0) deck->sync_target_bpm = deck_effective_bpm(other);
+        if (other->loaded && deck_base_bpm(other) > 1.0) deck->sync_target_bpm = deck_effective_bpm(other);
     } else if (contains(loop, x, y)) deck_toggle_loop(deck);
     else if (contains(loopdec, x, y)) deck_loop_length_prev(deck);
     else if (contains(loopinc, x, y)) deck_loop_length_next(deck);
@@ -785,7 +790,7 @@ void ui_handle_event(FtUi *ui, FtAudio *audio, FtDeck decks[2], const SDL_Event 
     case SDLK_c: deck_cue(deck); break;
     case SDLK_F3: deck_set_cue_current(deck); break;
     case SDLK_F1: deck_jump_cue(deck); break;
-    case SDLK_s: deck->sync_enabled = !deck->sync_enabled; if (other->loaded && deck_current_tempo(other) > 1.0) deck->sync_target_bpm = deck_effective_bpm(other); break;
+    case SDLK_s: deck->sync_enabled = !deck->sync_enabled; if (other->loaded && deck_base_bpm(other) > 1.0) deck->sync_target_bpm = deck_effective_bpm(other); break;
     case SDLK_l: deck_toggle_loop(deck); break;
     case SDLK_F5: deck_toggle_loop(deck); break;
     case SDLK_F6: deck_loop_length_prev(deck); break;

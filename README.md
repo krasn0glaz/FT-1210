@@ -90,6 +90,7 @@ Then run the same CMake commands.
 - Cue points are stored as tracker order/row positions. Current cue defaults to the start row of the active pattern.
 - Loops support row lengths and multi-pattern lengths. Slip mode is not implemented yet.
 - Channel scopes are oscilloscope-style traces driven by libopenmpt per-channel VU history. Channel muting uses `libopenmpt_ext`'s interactive channel mute API.
+- Displayed BPM is derived from tracker tempo and speed as `tempo * 6 / speed`, then adjusted by vinyl pitch. This keeps ProTracker speed-4 modules from incorrectly appearing as 125 BPM.
 - Sync is BPM-target based. Because arbitrary modules do not always expose a trustworthy BPM, this needs a proper BPM model next: parse tracker tempo/speed where possible, allow manual BPM entry, then sync pitch from deck A to B or B to A.
 
 ## Next Steps
