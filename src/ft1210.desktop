@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=FT-1210
+GenericName=Module DJ Deck
+Comment=Native module DJ deck inspired by PT-1210
+Exec=ft1210
+Icon=ft1210
+Terminal=false
+Categories=AudioVideo;Audio;Player;Midi;Music;
+Keywords=tracker;module;mod;xm;med;dj;openmpt;pt1210;

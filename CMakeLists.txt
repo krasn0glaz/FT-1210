@@ -42,3 +42,5 @@ target_link_directories(ft1210 PRIVATE
 )
 
 install(TARGETS ft1210 RUNTIME DESTINATION bin)
+install(FILES src/ft1210.desktop DESTINATION share/applications)
+install(FILES src/ft1210.svg DESTINATION share/icons/hicolor/scalable/apps)

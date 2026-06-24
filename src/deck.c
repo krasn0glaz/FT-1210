@@ -298,10 +298,12 @@ void deck_set_loop_out(FtDeck *deck) {
 
 void deck_toggle_loop(FtDeck *deck) {
     if (!deck->loaded) return;
-    if (deck->loop_start_order < 0) {
-        deck_set_loop_in(deck);
+    if (deck->loop_enabled) {
+        deck->loop_enabled = false;
+        return;
     }
-    deck->loop_enabled = !deck->loop_enabled;
+    deck_set_loop_in(deck);
+    deck->loop_enabled = true;
 }
 
 void deck_loop_length_next(FtDeck *deck) {

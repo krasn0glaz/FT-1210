@@ -36,5 +36,16 @@
           buildInputs = with pkgs; [ SDL2 libopenmpt zlib ];
         };
       });
+
+      apps = forAllSystems (pkgs: {
+        default = {
+          type = "app";
+          program = "${self.packages.${pkgs.stdenv.hostPlatform.system}.default}/bin/ft1210";
+        };
+        ft1210 = {
+          type = "app";
+          program = "${self.packages.${pkgs.stdenv.hostPlatform.system}.default}/bin/ft1210";
+        };
+      });
     };
 }
