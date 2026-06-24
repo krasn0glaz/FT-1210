@@ -1,4 +1,7 @@
-# FT-1210
+# FT-1210 - PoC
+
+**AI SLOP AND AI SLOP AND AI SLOP AND AI SLOP**
+**I builted dhis with AI aand this erelay neads a rewrite, if s0meone wabts to contribute - you are welcome, this would be appreciated**
 
 Native module DJ deck inspired by PT-1210, aimed at Linux first and macOS second.
 
