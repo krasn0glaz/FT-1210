@@ -61,12 +61,14 @@ Then run the same CMake commands.
 - `C`: jump to cue; creates cue at current pattern if none is set
 - `F3`: set cue to current pattern start
 - `F1`: jump to cue
+- right click `CUE` or `SET`: clear cue
 - `Left`, `Right`: temporary nudge selected deck
 - `N`: clear nudge immediately
 - `Up`, `Down`: pitch selected deck by 1 percent
 - `Shift+Up`, `Shift+Down`: pitch by 0.1 percent
 - `Home`: reset pitch
 - `PageUp`, `PageDown`: seek +/- 5 seconds
+- click the bottom order bar: seek to that pattern/order
 - `L`: pattern/order loop cycle/toggle
 - `F5`: toggle loop
 - `F6` / `F7`: decrease/increase loop length (`4/8/16/32/64/128` rows, then `1/2/4/8` patterns)
@@ -79,6 +81,7 @@ Then run the same CMake commands.
 - `=`, `-`: selected deck volume up/down
 - `[`, `]`: crossfader left/right
 - `Esc`: quit
+- click channel scope/header in the pattern table: toggle channel mute state
 
 ## Design Notes
 
@@ -86,6 +89,7 @@ Then run the same CMake commands.
 - Pitch is implemented by changing the render sample rate relative to the hardware output rate. This gives vinyl/CDJ-style repitching: faster playback is higher pitch, slower playback is lower pitch.
 - Cue points are stored as tracker order/row positions. Current cue defaults to the start row of the active pattern.
 - Loops support row lengths and multi-pattern lengths. Slip mode is not implemented yet.
+- Channel scopes are oscilloscope-style traces driven by libopenmpt per-channel VU history. Channel muting uses `libopenmpt_ext`'s interactive channel mute API.
 - Sync is BPM-target based. Because arbitrary modules do not always expose a trustworthy BPM, this needs a proper BPM model next: parse tracker tempo/speed where possible, allow manual BPM entry, then sync pitch from deck A to B or B to A.
 
 ## Next Steps

@@ -5,9 +5,12 @@
 #include <stdint.h>
 
 #include <libopenmpt/libopenmpt.h>
+#include <libopenmpt/libopenmpt_ext.h>
 
 #define FT1210_DECK_NAME_MAX 256
 #define FT1210_EQ_BANDS 3
+#define FT1210_MAX_CHANNELS 64
+#define FT1210_SCOPE_SAMPLES 64
 
 typedef enum FtLoopUnit {
     FT_LOOP_ROWS,
@@ -16,6 +19,9 @@ typedef enum FtLoopUnit {
 
 typedef struct FtDeck {
     openmpt_module *module;
+    openmpt_module_ext *module_ext;
+    openmpt_module_ext_interface_interactive interactive;
+    bool interactive_available;
     char path[1024];
     char title[FT1210_DECK_NAME_MAX];
     char format[FT1210_DECK_NAME_MAX];
@@ -43,6 +49,9 @@ typedef struct FtDeck {
     float vu_l;
     float vu_r;
     float spectrum[16];
+    bool channel_muted[FT1210_MAX_CHANNELS];
+    float channel_scope[FT1210_MAX_CHANNELS][FT1210_SCOPE_SAMPLES];
+    int channel_scope_pos;
     float hp_l[FT1210_EQ_BANDS];
     float hp_r[FT1210_EQ_BANDS];
     float lp_l[FT1210_EQ_BANDS];
@@ -57,7 +66,9 @@ void deck_stop(FtDeck *deck);
 void deck_cue(FtDeck *deck);
 void deck_set_cue_current(FtDeck *deck);
 void deck_jump_cue(FtDeck *deck);
+void deck_clear_cue(FtDeck *deck);
 void deck_seek_relative(FtDeck *deck, double delta_seconds);
+void deck_seek_order(FtDeck *deck, int order);
 void deck_set_pitch(FtDeck *deck, double pitch_percent);
 void deck_nudge(FtDeck *deck, double nudge_percent);
 void deck_toggle_loop(FtDeck *deck);
@@ -69,6 +80,8 @@ void deck_set_loop_out(FtDeck *deck);
 void deck_enforce_loop(FtDeck *deck);
 double deck_position_seconds(const FtDeck *deck);
 double deck_effective_rate(const FtDeck *deck);
+double deck_current_tempo(const FtDeck *deck);
+double deck_effective_bpm(const FtDeck *deck);
 int deck_current_order(const FtDeck *deck);
 int deck_current_row(const FtDeck *deck);
 int deck_current_pattern(const FtDeck *deck);
@@ -77,6 +90,9 @@ int deck_num_patterns(const FtDeck *deck);
 int deck_num_channels(const FtDeck *deck);
 int deck_current_playing_channels(const FtDeck *deck);
 float deck_channel_vu(const FtDeck *deck, int channel);
+bool deck_channel_muted(const FtDeck *deck, int channel);
+void deck_toggle_channel_mute(FtDeck *deck, int channel);
+void deck_update_channel_scopes(FtDeck *deck);
 int deck_current_pattern_rows(const FtDeck *deck);
 void deck_format_pattern_cell(const FtDeck *deck, int row, int channel, char *dst, int dst_len);
 

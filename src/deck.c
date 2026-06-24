@@ -39,7 +39,9 @@ void deck_init(FtDeck *deck) {
 }
 
 void deck_close(FtDeck *deck) {
-    if (deck->module) {
+    if (deck->module_ext) {
+        openmpt_module_ext_destroy(deck->module_ext);
+    } else if (deck->module) {
         openmpt_module_destroy(deck->module);
     }
     deck_init(deck);
@@ -85,20 +87,30 @@ bool deck_load(FtDeck *deck, const char *path, int sample_rate, char *err, int e
         { "play.at_end", "stop" },
         { NULL, NULL }
     };
-    openmpt_module *module = openmpt_module_create_from_memory2(data, (size_t)size, NULL, NULL, NULL, NULL, &openmpt_err, NULL, ctls);
+    openmpt_module_ext *module_ext = openmpt_module_ext_create_from_memory(data, (size_t)size, NULL, NULL, NULL, NULL, &openmpt_err, NULL, ctls);
     free(data);
 
-    if (!module) {
+    if (!module_ext) {
         set_error(err, err_len, "libopenmpt rejected module");
+        return false;
+    }
+    openmpt_module *module = openmpt_module_ext_get_module(module_ext);
+    if (!module) {
+        openmpt_module_ext_destroy(module_ext);
+        set_error(err, err_len, "libopenmpt ext rejected module");
         return false;
     }
 
     deck_close(deck);
+    deck->module_ext = module_ext;
     deck->module = module;
+    memset(&deck->interactive, 0, sizeof(deck->interactive));
+    deck->interactive_available = openmpt_module_ext_get_interface(module_ext, LIBOPENMPT_EXT_C_INTERFACE_INTERACTIVE, &deck->interactive, sizeof(deck->interactive)) != 0;
     deck->loaded = true;
     deck->playing = false;
     deck->volume = 1.0f;
-    deck->tempo_bpm = 125.0;
+    double initial_tempo = openmpt_module_get_current_tempo2(module);
+    deck->tempo_bpm = initial_tempo > 1.0 ? initial_tempo : 125.0;
     deck->sync_target_bpm = 125.0;
     deck->loop_start_order = -1;
     deck->loop_start_row = 0;
@@ -151,12 +163,28 @@ void deck_jump_cue(FtDeck *deck) {
     openmpt_module_set_position_order_row(deck->module, deck->cue_order, deck->cue_row);
 }
 
+void deck_clear_cue(FtDeck *deck) {
+    deck->cue_set = false;
+    deck->cue_order = 0;
+    deck->cue_row = 0;
+    deck->cue_seconds = 0.0;
+}
+
 void deck_seek_relative(FtDeck *deck, double delta_seconds) {
     if (!deck->loaded) return;
     double pos = openmpt_module_get_position_seconds(deck->module) + delta_seconds;
     if (pos < 0.0) pos = 0.0;
     if (deck->duration_seconds > 0.0 && pos > deck->duration_seconds) pos = deck->duration_seconds;
     openmpt_module_set_position_seconds(deck->module, pos);
+}
+
+void deck_seek_order(FtDeck *deck, int order) {
+    if (!deck->loaded) return;
+    int orders = deck_num_orders(deck);
+    if (orders <= 0) return;
+    if (order < 0) order = 0;
+    if (order >= orders) order = orders - 1;
+    openmpt_module_set_position_order_row(deck->module, order, 0);
 }
 
 void deck_set_pitch(FtDeck *deck, double pitch_percent) {
@@ -206,7 +234,35 @@ int deck_current_playing_channels(const FtDeck *deck) {
 
 float deck_channel_vu(const FtDeck *deck, int channel) {
     if (!deck->loaded || channel < 0 || channel >= deck_num_channels(deck)) return 0.0f;
+    if (channel < FT1210_MAX_CHANNELS && deck->channel_muted[channel]) return 0.0f;
     return openmpt_module_get_current_channel_vu_mono(deck->module, channel);
+}
+
+bool deck_channel_muted(const FtDeck *deck, int channel) {
+    if (channel < 0 || channel >= FT1210_MAX_CHANNELS) return false;
+    return deck->channel_muted[channel];
+}
+
+void deck_toggle_channel_mute(FtDeck *deck, int channel) {
+    if (!deck->loaded || channel < 0 || channel >= FT1210_MAX_CHANNELS) return;
+    deck->channel_muted[channel] = !deck->channel_muted[channel];
+    if (deck->interactive_available && deck->interactive.set_channel_mute_status) {
+        deck->interactive.set_channel_mute_status(deck->module_ext, channel, deck->channel_muted[channel] ? 1 : 0);
+    }
+}
+
+void deck_update_channel_scopes(FtDeck *deck) {
+    if (!deck->loaded) return;
+    int channels = deck_num_channels(deck);
+    if (channels > FT1210_MAX_CHANNELS) channels = FT1210_MAX_CHANNELS;
+    int pos = deck->channel_scope_pos % FT1210_SCOPE_SAMPLES;
+    for (int ch = 0; ch < channels; ch++) {
+        float vu = deck_channel_vu(deck, ch);
+        float phase = (float)((deck_current_row(deck) * 11 + ch * 7 + pos * 5) % 31) / 31.0f;
+        float wave = sinf((phase * 6.2831853f) + (float)pos * 0.18f + (float)ch * 0.7f);
+        deck->channel_scope[ch][pos] = wave * vu;
+    }
+    deck->channel_scope_pos = (pos + 1) % FT1210_SCOPE_SAMPLES;
 }
 
 int deck_current_pattern_rows(const FtDeck *deck) {
@@ -301,11 +357,22 @@ double deck_position_seconds(const FtDeck *deck) {
 
 double deck_effective_rate(const FtDeck *deck) {
     double pitch = deck->pitch_percent + deck->nudge_percent;
-    if (deck->sync_enabled && deck->tempo_bpm > 1.0 && deck->sync_target_bpm > 1.0) {
-        pitch += ((deck->sync_target_bpm / deck->tempo_bpm) - 1.0) * 100.0;
+    double tempo = deck_current_tempo(deck);
+    if (deck->sync_enabled && tempo > 1.0 && deck->sync_target_bpm > 1.0) {
+        pitch += ((deck->sync_target_bpm / tempo) - 1.0) * 100.0;
     }
     double rate = 1.0 + pitch / 100.0;
     if (rate < 0.25) rate = 0.25;
     if (rate > 4.0) rate = 4.0;
     return rate;
+}
+
+double deck_current_tempo(const FtDeck *deck) {
+    if (!deck->loaded || !deck->module) return deck->tempo_bpm > 1.0 ? deck->tempo_bpm : 125.0;
+    double tempo = openmpt_module_get_current_tempo2(deck->module);
+    return tempo > 1.0 ? tempo : (deck->tempo_bpm > 1.0 ? deck->tempo_bpm : 125.0);
+}
+
+double deck_effective_bpm(const FtDeck *deck) {
+    return deck_current_tempo(deck) * deck_effective_rate(deck);
 }

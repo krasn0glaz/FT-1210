@@ -72,6 +72,7 @@ static void render_deck(FtDeck *deck, int sample_rate, float *out, int frames, f
         }
         deck->vu_l = deck->vu_l * 0.86f + vu_l * 0.14f;
         deck->vu_r = deck->vu_r * 0.86f + vu_r * 0.14f;
+        deck_update_channel_scopes(deck);
         done += (int)got;
         if ((int)got < todo) break;
     }

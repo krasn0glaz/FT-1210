@@ -149,12 +149,18 @@ static const char **glyph(char c) {
     static const char *plus[7] = { "00000", "00100", "00100", "11111", "00100", "00100", "00000" };
     static const char *slash[7] = { "00001", "00010", "00010", "00100", "01000", "01000", "10000" };
     static const char *pct[7] = { "11001", "11010", "00010", "00100", "01000", "01011", "10011" };
+    static const char *under[7] = { "00000", "00000", "00000", "00000", "00000", "00000", "11111" };
+    static const char *apos[7] = { "01100", "01100", "00100", "01000", "00000", "00000", "00000" };
+    static const char *paren_l[7] = { "00010", "00100", "01000", "01000", "01000", "00100", "00010" };
+    static const char *paren_r[7] = { "01000", "00100", "00010", "00010", "00010", "00100", "01000" };
+    static const char *bang[7] = { "00100", "00100", "00100", "00100", "00100", "00000", "00100" };
+    static const char *comma[7] = { "00000", "00000", "00000", "00000", "01100", "01100", "01000" };
     c = (char)toupper((unsigned char)c);
     switch (c) {
     case ' ': return blank; case '?': return qmark; case '0': return g0; case '1': return g1; case '2': return g2; case '3': return g3; case '4': return g4; case '5': return g5; case '6': return g6; case '7': return g7; case '8': return g8; case '9': return g9;
     case 'A': return ga; case 'B': return gb; case 'C': return gc; case 'D': return gd; case 'E': return ge; case 'F': return gf; case 'G': return gg; case 'H': return gh; case 'I': return gi; case 'J': return gj; case 'K': return gk; case 'L': return gl; case 'M': return gm; case 'N': return gn; case 'O': return go; case 'P': return gp; case 'Q': return go; case 'R': return gr; case 'S': return gs; case 'T': return gt; case 'U': return gu; case 'V': return gv; case 'W': return gw; case 'X': return gx; case 'Y': return gy; case 'Z': return g2;
-    case '-': return dash; case '.': return dot; case ':': return colon; case '+': return plus; case '/': return slash; case '%': return pct;
-    default: return qmark;
+    case '-': return dash; case '.': return dot; case ':': return colon; case '+': return plus; case '/': return slash; case '%': return pct; case '_': return under; case '\'': return apos; case '(': return paren_l; case ')': return paren_r; case '!': return bang; case ',': return comma;
+    default: return blank;
     }
 }
 
@@ -213,7 +219,8 @@ static void meter(SDL_Renderer *r, Rect q, float l, float rr) {
     stroke(r, q, 70);
     for (int i = 0; i < 14; i++) {
         float threshold = (float)(i + 1) / 14.0f;
-        Uint8 v = (l > threshold || rr > threshold) ? (i > 11 ? 245 : 165) : 35;
+        float boosted = clampf((l > rr ? l : rr) * 2.6f, 0.0f, 1.0f);
+        Uint8 v = (boosted > threshold) ? (i > 11 ? 245 : 185) : 35;
         fill(r, (Rect){ q.x + 4, q.y + q.h - 7 - i * 9, q.w - 8, 5 }, v);
     }
 }
@@ -246,29 +253,64 @@ static float eq_knob_value(float db) {
 }
 
 static void app_layout(const FtUi *ui, Rect decks[2], Rect *mix) {
-    int margin = 22;
-    int mix_w = 330;
+    int margin = ui->width < 1000 ? 10 : 22;
+    int top = ui->height < 560 ? 58 : 76;
+    int bottom = 24;
+    if (ui->width < 840) {
+        int usable_h = ui->height - top - bottom - margin * 2;
+        if (usable_h < 360) usable_h = 360;
+        int deck_h = usable_h * 2 / 5;
+        int mix_h = usable_h - deck_h * 2;
+        if (mix_h < 210) mix_h = 210;
+        decks[0] = (Rect){ margin, top, ui->width - margin * 2, deck_h };
+        *mix = (Rect){ margin, decks[0].y + decks[0].h + margin, ui->width - margin * 2, mix_h };
+        decks[1] = (Rect){ margin, mix->y + mix->h + margin, ui->width - margin * 2, deck_h };
+        return;
+    }
+    int mix_w = ui->width < 1100 ? 260 : 330;
     int deck_w = (ui->width - margin * 4 - mix_w) / 2;
-    if (deck_w < 320) deck_w = 320;
-    decks[0] = (Rect){ margin, 76, deck_w, ui->height - 104 };
-    *mix = (Rect){ margin * 2 + deck_w, 76, mix_w, ui->height - 104 };
-    decks[1] = (Rect){ margin * 3 + deck_w + mix_w, 76, deck_w, ui->height - 104 };
+    decks[0] = (Rect){ margin, top, deck_w, ui->height - top - bottom };
+    *mix = (Rect){ margin * 2 + deck_w, top, mix_w, ui->height - top - bottom };
+    decks[1] = (Rect){ margin * 3 + deck_w + mix_w, top, deck_w, ui->height - top - bottom };
 }
 
 static void deck_layout(Rect q, Rect *pitch, Rect *browse, Rect *play, Rect *cue, Rect *setcue, Rect *sync, Rect *loop, Rect *loopdec, Rect *loopinc, Rect *nudge_back, Rect *nudge_fwd, Rect *nudge_clear, Rect *progress) {
-    *pitch = (Rect){ q.x + q.w - 72, q.y + 128, 42, 220 };
-    *browse = (Rect){ q.x + 24, q.y + q.h - 70, 86, 38 };
-    *play = (Rect){ q.x + 118, q.y + q.h - 70, 74, 38 };
-    *cue = (Rect){ q.x + 200, q.y + q.h - 70, 62, 38 };
-    *setcue = (Rect){ q.x + 270, q.y + q.h - 70, 62, 38 };
-    *sync = (Rect){ q.x + 340, q.y + q.h - 70, 62, 38 };
-    *loop = (Rect){ q.x + 410, q.y + q.h - 70, 62, 38 };
-    *loopdec = (Rect){ q.x + 24, q.y + q.h - 156, 44, 30 };
-    *loopinc = (Rect){ q.x + 128, q.y + q.h - 156, 44, 30 };
-    *nudge_back = (Rect){ q.x + 194, q.y + q.h - 156, 54, 30 };
-    *nudge_fwd = (Rect){ q.x + 254, q.y + q.h - 156, 54, 30 };
-    *nudge_clear = (Rect){ q.x + 314, q.y + q.h - 156, 62, 30 };
-    *progress = (Rect){ q.x + 24, q.y + q.h - 118, q.w - 48, 20 };
+    int pad = q.w < 420 ? 12 : 24;
+    int pitch_h = q.h < 500 ? 150 : 220;
+    *pitch = (Rect){ q.x + q.w - pad - 42, q.y + 128, 42, pitch_h };
+    if (q.w < 520) {
+        int gap = 6;
+        int bw = (q.w - pad * 2 - gap * 2) / 3;
+        int y2 = q.y + q.h - 58;
+        int y1 = y2 - 40;
+        *browse = (Rect){ q.x + pad, y1, bw, 32 };
+        *play = (Rect){ browse->x + bw + gap, y1, bw, 32 };
+        *cue = (Rect){ play->x + bw + gap, y1, bw, 32 };
+        *setcue = (Rect){ q.x + pad, y2, bw, 32 };
+        *sync = (Rect){ setcue->x + bw + gap, y2, bw, 32 };
+        *loop = (Rect){ sync->x + bw + gap, y2, bw, 32 };
+    } else {
+        *browse = (Rect){ q.x + pad, q.y + q.h - 70, 86, 38 };
+        *play = (Rect){ q.x + pad + 94, q.y + q.h - 70, 74, 38 };
+        *cue = (Rect){ q.x + pad + 176, q.y + q.h - 70, 62, 38 };
+        *setcue = (Rect){ q.x + pad + 246, q.y + q.h - 70, 62, 38 };
+        *sync = (Rect){ q.x + pad + 316, q.y + q.h - 70, 62, 38 };
+        *loop = (Rect){ q.x + pad + 386, q.y + q.h - 70, 62, 38 };
+    }
+    if (q.w < 420) {
+        *loopdec = (Rect){ q.x + pad, q.y + q.h - 156, 42, 30 };
+        *loopinc = (Rect){ q.x + pad + 50, q.y + q.h - 156, 42, 30 };
+        *nudge_back = (Rect){ q.x + pad + 108, q.y + q.h - 156, 48, 30 };
+        *nudge_fwd = (Rect){ q.x + pad + 162, q.y + q.h - 156, 48, 30 };
+        *nudge_clear = (Rect){ q.x + pad + 216, q.y + q.h - 156, 54, 30 };
+    } else {
+        *loopdec = (Rect){ q.x + pad, q.y + q.h - 156, 44, 30 };
+        *loopinc = (Rect){ q.x + pad + 104, q.y + q.h - 156, 44, 30 };
+        *nudge_back = (Rect){ q.x + pad + 170, q.y + q.h - 156, 54, 30 };
+        *nudge_fwd = (Rect){ q.x + pad + 230, q.y + q.h - 156, 54, 30 };
+        *nudge_clear = (Rect){ q.x + pad + 290, q.y + q.h - 156, 62, 30 };
+    }
+    *progress = (Rect){ q.x + pad, q.y + q.h - 118, q.w - pad * 2, 20 };
 }
 
 static void mixer_layout(Rect q, Rect eq[2][3], Rect vol[2], Rect gain[2], Rect master[3], Rect *cf) {
@@ -315,21 +357,18 @@ static void draw_pattern_blocks(SDL_Renderer *r, const FtDeck *deck, Rect q) {
     textf(r, q.x + 12, q.y + 12, 2, 135, "PATTERN STRUCTURE  %d ORDERS", orders);
 }
 
-static void draw_channel_scope(SDL_Renderer *r, const FtDeck *deck, Rect q) {
-    int channels = deck_num_channels(deck);
-    if (!deck->loaded || channels <= 0) return;
-    if (channels > 32) channels = 32;
-    int lane_h = q.h / channels;
-    if (lane_h < 4) lane_h = 4;
-    for (int ch = 0; ch < channels; ch++) {
-        int y = q.y + ch * lane_h;
-        float vu = clampf(deck_channel_vu(deck, ch), 0.0f, 1.0f);
-        Uint8 base = (Uint8)(22 + vu * 80.0f);
-        line(r, q.x, y, q.x + q.w, y, 24);
-        int w = (int)((float)q.w * vu);
-        if (w > 0) fill(r, (Rect){ q.x, y + 1, w, lane_h > 5 ? lane_h - 2 : 2 }, base);
-        int phase = (deck_current_row(deck) * 7 + ch * 19 + deck_current_order(deck) * 5) % (q.w > 1 ? q.w : 1);
-        line(r, q.x + phase, y + 1, q.x + phase, y + lane_h - 1, (Uint8)(90 + vu * 140.0f));
+static void draw_order_progress(SDL_Renderer *r, const FtDeck *deck, Rect q) {
+    stroke(r, q, 85);
+    if (!deck->loaded) return;
+    int orders = deck_num_orders(deck);
+    if (orders <= 0) return;
+    int current = deck_current_order(deck);
+    for (int i = 0; i < orders; i++) {
+        int x0 = q.x + 2 + (i * (q.w - 4)) / orders;
+        int x1 = q.x + 2 + ((i + 1) * (q.w - 4)) / orders;
+        Uint8 v = i == current ? 230 : (i < current ? 120 : 45);
+        fill(r, (Rect){ x0, q.y + 2, (x1 > x0 ? x1 - x0 : 1), q.h - 4 }, v);
+        if (orders <= 80) line(r, x0, q.y + 1, x0, q.y + q.h - 2, 18);
     }
 }
 
@@ -341,10 +380,14 @@ static void draw_pattern_table(SDL_Renderer *r, const FtDeck *deck, Rect q) {
     }
     int channels = deck_num_channels(deck);
     if (channels <= 0) channels = 4;
+    int max_visible_channels = (q.w - 44) / 42;
+    if (max_visible_channels < 1) max_visible_channels = 1;
     if (channels > 12) channels = 12;
+    if (channels > max_visible_channels) channels = max_visible_channels;
     int cur_row = deck_current_row(deck);
     int rows = deck_current_pattern_rows(deck);
-    int visible_rows = (q.h - 24) / 14;
+    int scope_h = 34;
+    int visible_rows = (q.h - scope_h - 34) / 14;
     if (visible_rows < 5) visible_rows = 5;
     int first_row = cur_row - visible_rows / 2;
     if (first_row < 0) first_row = 0;
@@ -357,21 +400,55 @@ static void draw_pattern_table(SDL_Renderer *r, const FtDeck *deck, Rect q) {
     textf(r, q.x + 8, q.y + 6, 1, 125, "PATTERN %02d  %dCH SHOWN", deck_current_pattern(deck), channels);
     for (int ch = 0; ch < channels; ch++) {
         int x = q.x + rownum_w + ch * col_w;
-        textf(r, x + 2, q.y + 6, 1, 105, "CH%02d", ch + 1);
+        float vu = deck_channel_vu(deck, ch);
+        if (deck_channel_muted(deck, ch)) {
+            fill(r, (Rect){ x, q.y + 18, col_w - 2, q.h - 20 }, 6);
+        } else if (vu > 0.01f) {
+            int strip_h = q.h - 20;
+            int vu_h = (int)((float)strip_h * clampf(vu * 1.9f, 0.0f, 1.0f));
+            fill(r, (Rect){ x, q.y + 18 + strip_h - vu_h, col_w - 2, vu_h }, (Uint8)(18 + vu * 42.0f));
+        }
+        Rect sq = { x + 2, q.y + 20, col_w - 4, scope_h - 4 };
+        stroke(r, sq, deck_channel_muted(deck, ch) ? 115 : 55);
+        textf(r, x + 2, q.y + 6, 1, deck_channel_muted(deck, ch) ? 80 : 105, "CH%02d", ch + 1);
+        int prev_x = sq.x;
+        int prev_y = sq.y + sq.h / 2;
+        for (int i = 1; i < FT1210_SCOPE_SAMPLES; i++) {
+            int idx = (deck->channel_scope_pos + i) % FT1210_SCOPE_SAMPLES;
+            int px = sq.x + (i * sq.w) / (FT1210_SCOPE_SAMPLES - 1);
+            int py = sq.y + sq.h / 2 - (int)(deck->channel_scope[ch][idx] * (float)(sq.h / 2 - 2));
+            line(r, prev_x, prev_y, px, py, deck_channel_muted(deck, ch) ? 65 : 190);
+            prev_x = px;
+            prev_y = py;
+        }
     }
     for (int i = 0; i < visible_rows; i++) {
         int row = first_row + i;
-        int y = q.y + 24 + i * 14;
+        int y = q.y + scope_h + 28 + i * 14;
         bool active = row == cur_row;
-        if (active) fill(r, (Rect){ q.x + 2, y - 1, q.w - 4, 13 }, 55);
         textf(r, q.x + 6, y, 1, active ? 240 : 90, "%02X", row);
         for (int ch = 0; ch < channels; ch++) {
             char cell[32];
             int x = q.x + rownum_w + ch * col_w;
             deck_format_pattern_cell(deck, row, ch, cell, sizeof(cell));
-            text(r, x + 2, y, cell, 1, active ? 245 : (deck_channel_vu(deck, ch) > 0.01f ? 155 : 75));
+            text(r, x + 2, y, cell, 1, active ? 245 : (deck_channel_muted(deck, ch) ? 45 : (deck_channel_vu(deck, ch) > 0.01f ? 155 : 75)));
         }
     }
+}
+
+static int pattern_table_channel_at(const FtDeck *deck, Rect q, int x, int y) {
+    if (!contains(q, x, y) || y < q.y + 18 || y > q.y + 58) return -1;
+    int channels = deck_num_channels(deck);
+    if (channels <= 0) return -1;
+    int max_visible_channels = (q.w - 44) / 42;
+    if (max_visible_channels < 1) max_visible_channels = 1;
+    if (channels > 12) channels = 12;
+    if (channels > max_visible_channels) channels = max_visible_channels;
+    int rownum_w = 34;
+    int col_w = (q.w - rownum_w - 10) / channels;
+    if (col_w < 42) col_w = 42;
+    int ch = (x - (q.x + rownum_w)) / col_w;
+    return (ch >= 0 && ch < channels) ? ch : -1;
 }
 
 static void draw_deck(SDL_Renderer *r, const FtDeck *deck, Rect q, const char *label) {
@@ -379,13 +456,12 @@ static void draw_deck(SDL_Renderer *r, const FtDeck *deck, Rect q, const char *l
     deck_layout(q, &pitch, &browse, &play, &cue, &setcue, &sync, &loop, &loopdec, &loopinc, &nudge_back, &nudge_fwd, &nudge_clear, &progress);
     fill(r, q, 7);
     stroke(r, q, deck->selected ? 235 : 65);
-    draw_channel_scope(r, deck, (Rect){ q.x + 8, q.y + 62, q.w - 16, q.h - 152 });
     text(r, q.x + 18, q.y + 18, label, 4, deck->selected ? 240 : 120);
     text(r, q.x + 76, q.y + 18, deck->loaded ? deck->title : "LOAD OR DROP MOD XM MED", 2, deck->loaded ? 175 : 105);
     textf(r, q.x + 76, q.y + 44, 1, 115, "%s", deck->loaded ? deck->format : "OPEN BROWSER BUTTON OR DRAG FILE ON DECK");
 
     if (deck->loaded) {
-        textf(r, q.x + 24, q.y + 76, 4, 210, "%.0f", deck->tempo_bpm * deck_effective_rate(deck));
+        textf(r, q.x + 24, q.y + 76, 4, 210, "%.0f", deck_effective_bpm(deck));
         text(r, q.x + 110, q.y + 86, "BPM", 2, 135);
         textf(r, q.x + 174, q.y + 80, 3, 190, "PAT %02d", deck_current_pattern(deck));
         textf(r, q.x + 304, q.y + 86, 2, 165, "ROW %02d", deck_current_row(deck));
@@ -393,7 +469,7 @@ static void draw_deck(SDL_Renderer *r, const FtDeck *deck, Rect q, const char *l
         textf(r, q.x + 24, q.y + 122, 2, 135, "%dCH  SPD %d  LOOP %s", deck_num_channels(deck), openmpt_module_get_current_speed(deck->module), deck_loop_length_label(deck));
     } else {
         text(r, q.x + 24, q.y + 96, "TRACKER DECK", 3, 70);
-        text(r, q.x + 24, q.y + 130, "MODULES ARE STRUCTURE NOT WAVEFORMS", 1, 80);
+        text(r, q.x + 24, q.y + 130, "MODULES ARE ACCEPTED", 1, 80);
     }
 
     draw_pattern_blocks(r, deck, (Rect){ q.x + 24, q.y + 152, q.w - 120, 82 });
@@ -402,20 +478,17 @@ static void draw_deck(SDL_Renderer *r, const FtDeck *deck, Rect q, const char *l
     snprintf(pitch_label, sizeof(pitch_label), "%+.1f%%", deck->pitch_percent);
     slider(r, pitch, (float)(deck->pitch_percent / 12.0), true, "PITCH", pitch_label);
 
-    stroke(r, progress, 85);
-    if (deck->loaded && deck->duration_seconds > 0.0) {
-        float f = clampf((float)(deck_position_seconds(deck) / deck->duration_seconds), 0.0f, 1.0f);
-        fill(r, (Rect){ progress.x + 2, progress.y + 2, (int)((progress.w - 4) * f), progress.h - 4 }, 150);
-    }
+    draw_order_progress(r, deck, progress);
 
-    button(r, browse, "BROWSE", false);
+    bool narrow = q.w < 520;
+    button(r, browse, narrow ? "BRW" : "BROWSE", false);
     button(r, play, deck->playing ? "STOP" : "PLAY", deck->playing);
     button(r, cue, deck->cue_set ? "CUE*" : "CUE", deck->cue_set);
     button(r, setcue, "SET", false);
     button(r, sync, "SYNC", deck->sync_enabled);
     button(r, loop, "LOOP", deck->loop_enabled);
     button(r, loopdec, "L-", false);
-    text(r, loopdec.x + 48, loopdec.y + 8, deck_loop_length_label(deck), 1, 150);
+    if (!narrow) text(r, loopdec.x + 48, loopdec.y + 8, deck_loop_length_label(deck), 1, 150);
     button(r, loopinc, "L+", false);
     button(r, nudge_back, "N-", deck->nudge_percent < 0.0);
     button(r, nudge_fwd, "N+", deck->nudge_percent > 0.0);
@@ -427,10 +500,9 @@ static void draw_mixer(SDL_Renderer *r, const FtAudio *audio, const FtDeck decks
     mixer_layout(q, eq, vol, gain, master, &cf);
     fill(r, q, 6);
     stroke(r, q, 75);
-    text(r, q.x + 76, q.y + 18, "MIXER", 3, 170);
+    text(r, q.x + q.w / 2 - 45, q.y + 18, "MIXER", 3, 170);
     text(r, q.x + 28, q.y + 52, "DECK A", 2, decks[0].selected ? 235 : 120);
     text(r, q.x + q.w - 112, q.y + 52, "DECK B", 2, decks[1].selected ? 235 : 120);
-    text(r, q.x + q.w / 2 - 30, q.y + 78, "VU", 2, 120);
     meter(r, master[0], decks[0].vu_l, decks[0].vu_r);
     meter(r, master[1], decks[1].vu_l, decks[1].vu_r);
     button(r, master[2], decks[0].sync_enabled ? "MASTER B" : (decks[1].sync_enabled ? "MASTER A" : "FREE"), decks[0].sync_enabled || decks[1].sync_enabled);
@@ -549,26 +621,47 @@ static bool handle_deck_click(FtUi *ui, FtAudio *audio, FtDeck decks[2], int dec
     audio_lock(audio);
     FtDeck *deck = &decks[deck_index];
     FtDeck *other = &decks[deck_index == 0 ? 1 : 0];
+    Rect table = { q.x + 24, q.y + 244, q.w - 120, q.h - 420 };
+    int mute_ch = pattern_table_channel_at(deck, table, x, y);
     if (clicks >= 2 && contains(pitch, x, y)) {
         deck_set_pitch(deck, 0.0);
+    } else if (mute_ch >= 0) {
+        deck_toggle_channel_mute(deck, mute_ch);
     } else if (contains(browse, x, y)) { ui->browser_open = true; ui->browser_deck = deck_index; }
     else if (contains(play, x, y)) deck_play_pause(deck);
     else if (contains(cue, x, y)) deck_cue(deck);
     else if (contains(setcue, x, y)) deck_set_cue_current(deck);
     else if (contains(sync, x, y)) {
         deck->sync_enabled = !deck->sync_enabled;
-        if (other->loaded && other->tempo_bpm > 1.0) deck->sync_target_bpm = other->tempo_bpm * deck_effective_rate(other);
+        if (other->loaded && deck_current_tempo(other) > 1.0) deck->sync_target_bpm = deck_effective_bpm(other);
     } else if (contains(loop, x, y)) deck_toggle_loop(deck);
     else if (contains(loopdec, x, y)) deck_loop_length_prev(deck);
     else if (contains(loopinc, x, y)) deck_loop_length_next(deck);
     else if (contains(nudge_back, x, y)) { deck_nudge(deck, -3.0); ui->drag_kind = DRAG_NUDGE; ui->drag_deck = deck_index; }
     else if (contains(nudge_fwd, x, y)) { deck_nudge(deck, 3.0); ui->drag_kind = DRAG_NUDGE; ui->drag_deck = deck_index; }
     else if (contains(nudge_clear, x, y)) deck_nudge(deck, 0.0);
+    else if (contains(progress, x, y)) {
+        int orders = deck_num_orders(deck);
+        if (orders > 0) deck_seek_order(deck, ((x - progress.x) * orders) / progress.w);
+    }
     else if (contains(pitch, x, y)) { ui->drag_kind = DRAG_PITCH; ui->drag_deck = deck_index; }
     audio_unlock(audio);
 
     if (ui->drag_kind != DRAG_NONE) apply_drag(ui, audio, decks, x, y);
     return true;
+}
+
+static bool handle_deck_right_click(FtAudio *audio, FtDeck decks[2], int deck_index, Rect q, int x, int y) {
+    Rect pitch, browse, play, cue, setcue, sync, loop, loopdec, loopinc, nudge_back, nudge_fwd, nudge_clear, progress;
+    deck_layout(q, &pitch, &browse, &play, &cue, &setcue, &sync, &loop, &loopdec, &loopinc, &nudge_back, &nudge_fwd, &nudge_clear, &progress);
+    if (!contains(q, x, y)) return false;
+    if (contains(cue, x, y) || contains(setcue, x, y)) {
+        audio_lock(audio);
+        deck_clear_cue(&decks[deck_index]);
+        audio_unlock(audio);
+        return true;
+    }
+    return false;
 }
 
 static bool handle_mixer_click(FtUi *ui, FtAudio *audio, FtDeck decks[2], Rect q, int x, int y, int clicks) {
@@ -581,11 +674,11 @@ static bool handle_mixer_click(FtUi *ui, FtAudio *audio, FtDeck decks[2], Rect q
     } else if (contains(master[2], x, y)) {
         if (!decks[0].sync_enabled && !decks[1].sync_enabled) {
             decks[1].sync_enabled = true;
-            decks[1].sync_target_bpm = decks[0].tempo_bpm * deck_effective_rate(&decks[0]);
+            decks[1].sync_target_bpm = deck_effective_bpm(&decks[0]);
         } else if (decks[1].sync_enabled) {
             decks[1].sync_enabled = false;
             decks[0].sync_enabled = true;
-            decks[0].sync_target_bpm = decks[1].tempo_bpm * deck_effective_rate(&decks[1]);
+            decks[0].sync_target_bpm = deck_effective_bpm(&decks[1]);
         } else {
             decks[0].sync_enabled = false;
             decks[1].sync_enabled = false;
@@ -656,6 +749,12 @@ void ui_handle_event(FtUi *ui, FtAudio *audio, FtDeck decks[2], const SDL_Event 
         audio_unlock(audio);
         return;
     }
+    if (event->type == SDL_MOUSEBUTTONDOWN && event->button.button == SDL_BUTTON_RIGHT) {
+        Rect deck_rects[2], mix;
+        app_layout(ui, deck_rects, &mix);
+        if (handle_deck_right_click(audio, decks, 0, deck_rects[0], event->button.x, event->button.y)) return;
+        if (handle_deck_right_click(audio, decks, 1, deck_rects[1], event->button.x, event->button.y)) return;
+    }
     if (event->type == SDL_MOUSEBUTTONDOWN && event->button.button == SDL_BUTTON_LEFT) {
         if (handle_browser_click(ui, audio, decks, event->button.x, event->button.y)) return;
         Rect deck_rects[2], mix;
@@ -686,7 +785,7 @@ void ui_handle_event(FtUi *ui, FtAudio *audio, FtDeck decks[2], const SDL_Event 
     case SDLK_c: deck_cue(deck); break;
     case SDLK_F3: deck_set_cue_current(deck); break;
     case SDLK_F1: deck_jump_cue(deck); break;
-    case SDLK_s: deck->sync_enabled = !deck->sync_enabled; if (other->loaded && other->tempo_bpm > 1.0) deck->sync_target_bpm = other->tempo_bpm * deck_effective_rate(other); break;
+    case SDLK_s: deck->sync_enabled = !deck->sync_enabled; if (other->loaded && deck_current_tempo(other) > 1.0) deck->sync_target_bpm = deck_effective_bpm(other); break;
     case SDLK_l: deck_toggle_loop(deck); break;
     case SDLK_F5: deck_toggle_loop(deck); break;
     case SDLK_F6: deck_loop_length_prev(deck); break;
@@ -721,8 +820,8 @@ void ui_render(FtUi *ui, const FtAudio *audio, const FtDeck decks[2]) {
     SDL_RenderClear(ui->renderer);
     Rect deck_rects[2], mix;
     app_layout(ui, deck_rects, &mix);
-    text(ui->renderer, 22, 22, "FT-1210 MODULE DJ", 3, 190);
-    text(ui->renderer, 22, 50, "B BROWSER  DRAG MODULES  VINYL REPITCH  TRACKER PATTERN VIEW", 1, 105);
+    text(ui->renderer, 22, 22, "FT-1210", 3, 190);
+    text(ui->renderer, 22, 50, "INSPIRED BY DJ H0FFMAN'S PT-1210", 1, 105);
     draw_deck(ui->renderer, &decks[0], deck_rects[0], "A");
     draw_deck(ui->renderer, &decks[1], deck_rects[1], "B");
     draw_mixer(ui->renderer, audio, decks, mix);
